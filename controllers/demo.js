@@ -1,63 +1,40 @@
 const { QueryTypes } = require("sequelize");
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
 const sequelize = require("../../utils/sequelize");
 
-const loginUser = async (req, res) => {
-  const { email, password } = req.body;
+const createCategory = async (req, res) => {
+  const { categoryName } = req.body;
 
-  if (!email || !password) {
-    return res.status(400).json({ message: "email and password are required" });
+  const createdBy = req.user.userId;
+
+  if (!categoryName) {
+    return res.status(400).json({ message: "categoryName is required" });
   }
 
   try {
-    // Checking if the user exists
-    const getUser = await sequelize.query(
-      `SELECT * FROM users WHERE email = :email`,
+    const categoryExists = await sequelize.query(
+      `SELECT categoryName FROM categories WHERE categoryName = :categoryName AND createdBy = :createdBy`,
       {
-        replacements: { email },
+        replacements: { categoryName, createdBy },
         type: QueryTypes.SELECT,
       }
     );
 
-    // Checking if the user exists
-    if (!getUser.length) {
-      return res.status(400).json({ message: "wrong email" });
+    if (categoryExists.length) {
+      return res.status(400).json({ message: "category already exists" });
     }
 
-    // Getting the hashed password from the database
-    const hashedPassword = getUser[0].password;
+    await sequelize.query(
+      "INSERT INTO categories (categoryName, createdBy) VALUES (:categoryName, :createdBy)",
+      {
+        replacements: { categoryName, createdBy },
+        type: QueryTypes.INSERT,
+      }
+    );
 
-    // Comparing the password
-    const validPassword = await bcrypt.compare(password, hashedPassword);
-
-    if (!validPassword) {
-      return res.status(400).json({ message: "wrong password" });
-    } else {
-      return jwt.sign(
-        {
-          userId: getUser[0].userId,
-          email: getUser[0].email,
-          firstName: getUser[0].firstName,
-          lastName: getUser[0].lastName,
-          gender: getUser[0].gender,
-          hobbies: getUser[0].hobbies,
-          profilePic: getUser[0].profilePic,
-          roleName: getUser[0].roleName,
-        },
-        process.env.JWT_SECRET,
-        { expiresIn: "1h" },
-        (err, token) => {
-          if (err) {
-            return res.status(500).json({ message: err.message });
-          }
-          return res.status(200).json({ message: "success", token });
-        }
-      );
-    }
+    return res.status(200).json({ message: "success" });
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
 };
 
-module.exports = loginUser;
+module.exports = createCategory;

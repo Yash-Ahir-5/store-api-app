@@ -1,189 +1,216 @@
-const sequelize = require("../utiles/database");
 const { QueryTypes } = require("sequelize");
-const Joi = require("joi");
-const fs = require("fs");
-const jwt = require("jsonwebtoken");
-const { hashPassword, comparePassword } = require("../helper/SecurePassword");
+const sequelize = require("../utiles/database");
 
-const welcome = (req, res) => {
-  res.send("hello");
-};
-
-const addUser = async (req, res) => {
-  const removePPicIfErr = () => {
-    fs.unlink(`./public/assets/${req.file?.filename}`, (err, succ) => {
-      if (err) {
-        console.log("Error" + err.message);
-      }
-    });
-  };
-  console.log(req.body);
-  console.log(req.file.filename);
-
+//*List category for both user & admin
+const listCategory = async (req, res) => {
   try {
-    const { firstname, lastname, email, password, gender, hobbies, userRole } =
-      req.body;
+    const { id, userRole } = req.obj;
 
-    const profile_pic = req.file.filename;
-    // const profile_pic = "Static";
+    if (userRole != 1) {
+      const showCategoryByUser = await sequelize.query(
+        "select * from categories where createdBy = ?",
+        {
+          type: QueryTypes.SELECT,
+          replacements: [id],
+        }
+      );
 
-    console.log(firstname + profile_pic);
-
-    if (!firstname) {
-      return res.status(400).json({ error: "Firstname cannot be empty" });
-    }
-
-    if (!lastname) {
-      return res.status(400).json({ error: "Lastname cannot be empty" });
-    }
-
-    if (!email) {
-      return res.status(400).json({ error: "Email cannot be empty" });
-    }
-
-    if (!email.endsWith("@gmail.com" || "@email.com" || "@yahoo.com")) {
-      return res
-        .status(550)
-        .json({ Error: "User Unknown - Email must be from example.com" });
-    }
-
-    if (!password) {
-      return res.status(400).json({ error: "Password cannot be empty" });
-    }
-
-    if (!gender) {
-      return res.status(400).json({ error: "Gender cannot be empty" });
-    }
-
-    if (!hobbies || hobbies.length === 0) {
-      return res.status(400).json({ error: "Hobbies cannot be empty" });
-    }
-
-    // if (!userRole) {
-    //   return res.status(400).json({ error: "UserRole cannot be empty" });
-    // }
-
-    if (!profile_pic) {
-      return res.status(400).json({ error: "Profile picture cannot be empty" });
-    }
-
-    const checkEmail = await sequelize.query(
-      "select * from users where email = ?",
-      {
-        type: QueryTypes.SELECT,
-        replacements: [email],
+      if (showCategoryByUser.length == 0) {
+        return res.status(400).json({
+          error: "NOTHING! to show, you don't have any category",
+        });
       }
-    );
 
-    if (checkEmail.length != 0) {
-      removePPicIfErr();
-      //
-      return res.status(409).json({ error: "Email already exist" });
-    }
-
-    //One Admin only
-    if (userRole == 1) {
-      const [adminUser] = await sequelize.query(
-        `select email from users where userRole = 1`,
+      res.status(200).json({ status: "success", showCategoryByUser });
+    } else {
+      const showCategoryByAdmin = await sequelize.query(
+        "select * from categories",
         {
           type: QueryTypes.SELECT,
         }
       );
 
-      if (adminUser) {
-        console.log(adminUser);
-        return res.status(409).json({ error: "Admin already exist" });
+      if (showCategoryByAdmin.length == 0) {
+        return res.status(400).json({
+          error: "NOTHING! to show, there's no category exist",
+        });
       }
+
+      res.status(200).json({ status: "success", showCategoryByAdmin });
     }
-
-    console.log(__dirname + "public/assets" + `/${profile_pic}`);
-
-    //insertData
-    const securePassword = await hashPassword(password);
-    const userCreated = await sequelize.query(
-      "INSERT INTO `users` (`firstname`, `lastname`, `email`, `password`, `gender`, `hobbies`, `userRole`, `profile_pic`) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-      {
-        type: QueryTypes.INSERT,
-        replacements: [
-          firstname,
-          lastname,
-          email,
-          securePassword,
-          gender,
-          hobbies,
-          userRole || "2",
-          profile_pic,
-        ],
-      }
-    );
-
-    if (userCreated == undefined) {
-      res.status(400).json({ error: "Error while creating the user" });
-    }
-    res
-      .status(200)
-      .json({ success: true, message: "User registered successfully" });
   } catch (err) {
-    removePPicIfErr();
     res.status(500).json({ error: "Internal server error" });
   }
 };
 
-const loginUser = async (req, res) => {
+//*Add category for both user & admin
+const addCategory = async (req, res) => {
+  const { categoryName } = req.body;
+
+  if (!categoryName) {
+    return res.status(400).json({ error: "Category field is empty" });
+  }
+
   try {
-    const { email, password } = req.body;
+    const { id, userRole } = req.obj;
 
-    if (!email) {
-      return res.status(400).json({ error: "Email cannot be empty" });
-    }
-    if (!email.endsWith("@gmail.com" || "@email.com" || "@yahoo.com")) {
-      return res
-        .status(550)
-        .json({ Error: "User Unknown - Email must be from example.com" });
-    }
-    if (!password) {
-      return res.status(400).json({ error: "Password cannot be empty" });
-    }
-
-    const [checkUser] = await sequelize.query(
-      "select * from users where email = ?",
+    const checkCategory = await sequelize.query(
+      "select * from categories where categoryname = ?",
       {
         type: QueryTypes.SELECT,
-        replacements: [email],
+        replacements: [categoryName.toLowerCase()],
       }
     );
 
-    if (checkUser == undefined) {
-      return res.status(404).json({ error: "Email does not exist" });
+    if (checkCategory.length != 0) {
+      return res.status(409).json({ error: "Category name already exist" });
     }
 
-    const comparePass = await comparePassword(password, checkUser.password);
-
-    if (!comparePass) {
-      return res.status(404).json({ error: "Enter the correct credentails" });
-    }
-
-    jwt.sign(
-      checkUser,
-      process.env.SECUREKEY,
-      { expiresIn: "1h" },
-      (err, authToken) => {
-        if (err) {
-          return res.status(404).json({ error: "Token error" });
-        }
-
-        res
-          .status(200)
-          .json({ status: "success", id: checkUser.id, authToken });
+    const addCategoryQuery = await sequelize.query(
+      "insert into categories (categoryname, createdBy) values (?, ?)",
+      {
+        type: QueryTypes.INSERT,
+        replacements: [categoryName.toLowerCase(), id],
       }
     );
+
+    if (!addCategoryQuery) {
+      return res
+        .status(400)
+        .json({ error: `error creating the categorie by user id ${id}` });
+    }
+
+    res.status(200).json({
+      status: "success",
+      msg: `Created '${categoryName}' Successfully`,
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Internal server error" });
+  }
+
+  // if (userRole != 1) {
+  // } else {
+  // }
+};
+
+//*Update category for both user & admin
+const updateCategory = async (req, res) => {
+  const { updateCategoryName } = req.body;
+  const { firstname, userRole } = req.obj;
+
+  if (!updateCategoryName) {
+    return res.status(400).json({ error: "Update category field is empty" });
+  }
+  try {
+    const categoryId = req.params.id;
+    const { id } = req.obj;
+
+    const [categoryDetail] = await sequelize.query(
+      "select * from categories where id = ?",
+      {
+        type: QueryTypes.SELECT,
+        replacements: [categoryId],
+      }
+    );
+    if (categoryDetail == undefined) {
+      return res.status(404).json({ error: "No category found....!" });
+    }
+
+    if (userRole != 1) {
+      if (id != categoryDetail.createdBy) {
+        return res.status(400).json({
+          error: `Category does not belong's to you Mr.${firstname}`,
+        });
+      }
+    }
+
+    const checkUpdatedCategoryName = await sequelize.query(
+      "select * from categories where categoryname = ?",
+      {
+        type: QueryTypes.SELECT,
+        replacements: [updateCategoryName.toLowerCase()],
+      }
+    );
+
+    if (checkUpdatedCategoryName.length != 0) {
+      return res
+        .status(409)
+        .json({ error: "The new category name already exist" });
+    }
+
+    const changeCategoryNameQuery = await sequelize.query(
+      "UPDATE `categories` SET `categoryname` = ? WHERE `categories`.`id` = ?",
+      {
+        type: QueryTypes.UPDATE,
+        replacements: [updateCategoryName.toLowerCase(), categoryDetail.id],
+      }
+    );
+
+    if (!changeCategoryNameQuery) {
+      return res
+        .status(400)
+        .json({ error: "Something happen while updating the query" });
+    }
+
+    res.status(200).json({
+      status: "success",
+      msg: `'${categoryDetail.categoryname}' is changed to '${updateCategoryName}'`,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+//*Delete category for both user & admin
+const deleteCategory = async (req, res) => {
+  const { firstname, userRole, gender } = req.obj;
+  try {
+    const categoryId = req.params.id;
+    const { id } = req.obj;
+
+    const [categoryDetail] = await sequelize.query(
+      "select * from categories where id = ?",
+      {
+        type: QueryTypes.SELECT,
+        replacements: [categoryId],
+      }
+    );
+
+    if (categoryDetail == undefined) {
+      return res.status(404).json({ error: "No category found....!" });
+    }
+
+    if (userRole != 1) {
+      const holder = gender == "Male" ? "Mr." : "Miss.";
+      if (id != categoryDetail.createdBy) {
+        return res.status(400).json({
+          error: `DELETION ABORTED, Category does not belong's to you ${
+            holder + firstname
+          }`,
+        });
+      }
+    }
+
+    await sequelize.query(
+      "DELETE FROM `categories` WHERE `categories`.`id` = ?",
+      {
+        type: QueryTypes.DELETE,
+        replacements: [categoryDetail.id],
+      }
+    );
+
+    res.status(200).json({
+      status: "success",
+      msg: `Category named '${categoryDetail.categoryname}' is deleted`,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 };
 
 module.exports = {
-  welcome,
-  addUser,
-  loginUser,
+  listCategory,
+  addCategory,
+  updateCategory,
+  deleteCategory,
 };

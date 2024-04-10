@@ -160,7 +160,12 @@ const loginUser = async (req, res) => {
     }
 };
 
+// const deleteUser = async (req, res) => {
+//     const { id } = req.params;
+// }
+
 module.exports = {
     registerUser,
-    loginUser
+    loginUser,
+    // deleteUser
 }
