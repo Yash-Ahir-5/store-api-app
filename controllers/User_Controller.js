@@ -145,7 +145,7 @@ const loginUser = async (req, res) => {
             jwt.sign(
                 checkUser[0],
                 process.env.JWT_SECRET,
-                { expiresIn: "600s" },
+                { expiresIn: "2h" },
                 (err, token) => {
                     if (err) {
                         console.log(err);
