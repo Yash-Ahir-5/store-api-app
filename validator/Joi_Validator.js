@@ -12,4 +12,4 @@ const signUpSchema = Joi.object({
     user_role: Joi.string().required()
 });
 
-exports.validUserDetails = validator(signUpSchema);
+exports.validUserDetails = validator(signUpSchema); 

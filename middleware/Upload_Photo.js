@@ -24,6 +24,6 @@ const limits = {
 const uploadPhoto = multer({
   storage,
   limits,
-}).single("profile_pic");
+});
 
 module.exports = uploadPhoto
