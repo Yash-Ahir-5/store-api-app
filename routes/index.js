@@ -11,9 +11,7 @@ router.get('/', (req, res) => {
     res.send("Hello")
 })
 
-router.get('/public/assets/:filename', (req, res) => {
-    res.sendFile(`../public/assets/${req.params.filename}`);
-})
+
 
 //User's API
 router.post('/register',uploadPhoto.single("profile_pic"),registerUser);
