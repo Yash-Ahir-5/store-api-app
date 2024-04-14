@@ -61,13 +61,13 @@ const addProducts = async (req, res) => {
             console.log("in if");
             req.files.forEach(file => {
                 console.log(file.filename);
-                if (file && file.filename) {
+               
                     fs.unlink(`./public/assets/${file.filename}`, (err) => {
                         if (err) {
                             console.error("Error:", err.message);
                         }
                     });
-                }
+                
             });
         }
     };
