@@ -19,7 +19,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // app.use('/api', require('./routes'));
 
-sequelize;x
+sequelize;
 
 app.use("/", require("./routes"));
 app.use("/public", express.static(path.join(__dirname, "/public/assets")));
